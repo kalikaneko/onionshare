@@ -21,7 +21,8 @@ import platform
 from PyQt4 import QtCore, QtGui
 
 import common
-from onionshare import strings, helpers
+from onionshare import strings
+
 
 class ServerStatus(QtGui.QVBoxLayout):
     server_started = QtCore.pyqtSignal()
@@ -149,4 +150,3 @@ class ServerStatus(QtGui.QVBoxLayout):
             clipboard.setText(url)
 
         self.url_copied.emit()
-

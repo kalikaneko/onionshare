@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from PyQt4 import QtCore, QtGui
 
-import common
 from onionshare import strings, helpers
+
 
 class Downloads(QtGui.QVBoxLayout):
     def __init__(self):
@@ -65,5 +65,5 @@ class Downloads(QtGui.QVBoxLayout):
         if downloaded_bytes == pb.total_bytes:
             pb.setFormat("%p%")
         else:
-            pb.setFormat("{0}, %p%".format(helpers.human_readable_filesize(downloaded_bytes)))
-
+            pb.setFormat("{0}, %p%".format(
+                helpers.human_readable_filesize(downloaded_bytes)))

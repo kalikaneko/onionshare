@@ -17,8 +17,15 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import os, inspect, hashlib, base64, hmac, platform, zipfile
+import base64
+import hashlib
+import hmac
+import inspect
+import os
+import platform
+import zipfile
 from itertools import izip
+
 
 def get_platform():
     p = platform.system()
@@ -26,12 +33,15 @@ def get_platform():
         p = 'Tails'
     return p
 
+
 def get_onionshare_dir():
     if get_platform() == 'Darwin':
         onionshare_dir = os.path.dirname(__file__)
     else:
-        onionshare_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        onionshare_dir = os.path.dirname(
+            os.path.abspath(inspect.getfile(inspect.currentframe())))
     return onionshare_dir
+
 
 def constant_time_compare(val1, val2):
     _builtin_constant_time_compare = getattr(hmac, 'compare_digest', None)
@@ -49,19 +59,21 @@ def constant_time_compare(val1, val2):
         result |= x ^ y
     return result == 0
 
+
 def random_string(num_bytes, output_len=None):
     b = os.urandom(num_bytes)
     h = hashlib.sha256(b).digest()[:16]
-    s = base64.b32encode(h).lower().replace('=','')
+    s = base64.b32encode(h).lower().replace('=', '')
     if not output_len:
         return s
     return s[:output_len]
+
 
 def human_readable_filesize(b):
     thresh = 1024.0
     if b < thresh:
         return '{0} B'.format(b)
-    units = ['KiB','MiB','GiB','TiB','PiB','EiB','ZiB','YiB']
+    units = ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']
     u = 0
     b /= thresh
     while b >= thresh:
@@ -69,8 +81,10 @@ def human_readable_filesize(b):
         u += 1
     return '{0} {1}'.format(round(b, 1), units[u])
 
+
 def is_root():
     return os.geteuid() == 0
+
 
 def dir_size(start_path):
     total_size = 0
@@ -80,6 +94,7 @@ def dir_size(start_path):
             if not os.path.islink(fp):
                 total_size += os.path.getsize(fp)
     return total_size
+
 
 def get_tmp_dir():
     if get_platform() == "Windows":
@@ -91,17 +106,20 @@ def get_tmp_dir():
         temp = '/tmp'
     return temp
 
+
 class ZipWriter(object):
     def __init__(self, zip_filename=None):
         if zip_filename:
             self.zip_filename = zip_filename
         else:
-            self.zip_filename = '{0}/onionshare_{1}.zip'.format(get_tmp_dir(), random_string(4, 6))
+            self.zip_filename = '{0}/onionshare_{1}.zip'.format(
+                get_tmp_dir(), random_string(4, 6))
 
         self.z = zipfile.ZipFile(self.zip_filename, 'w')
 
     def add_file(self, filename):
-        self.z.write(filename, os.path.basename(filename), zipfile.ZIP_DEFLATED)
+        self.z.write(
+            filename, os.path.basename(filename), zipfile.ZIP_DEFLATED)
 
     def add_dir(self, filename):
         dir_to_strip = os.path.dirname(filename)+'/'
@@ -110,8 +128,8 @@ class ZipWriter(object):
                 full_filename = os.path.join(dirpath, f)
                 if not os.path.islink(full_filename):
                     arc_filename = full_filename[len(dir_to_strip):]
-                    self.z.write(full_filename, arc_filename, zipfile.ZIP_DEFLATED)
+                    self.z.write(
+                        full_filename, arc_filename, zipfile.ZIP_DEFLATED)
 
     def close(self):
         self.z.close()
-

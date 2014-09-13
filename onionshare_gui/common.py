@@ -17,20 +17,27 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import os, sys, inspect, platform
+import inspect
+import os
+import platform
+import sys
+
 
 def get_onionshare_gui_dir():
     if platform.system() == 'Darwin':
         onionshare_gui_dir = os.path.dirname(__file__)
     else:
-        onionshare_gui_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        onionshare_gui_dir = os.path.dirname(
+            os.path.abspath(inspect.getfile(inspect.currentframe())))
     return onionshare_gui_dir
 
 onionshare_gui_dir = get_onionshare_gui_dir()
+
 
 def get_image_path(filename):
     if platform.system() == 'Linux':
         prefix = os.path.join(sys.prefix, 'share/onionshare/images')
     else:
-        prefix = os.path.join(os.path.dirname(get_onionshare_gui_dir()), 'images')
+        prefix = os.path.join(
+            os.path.dirname(get_onionshare_gui_dir()), 'images')
     return os.path.join(prefix, filename)

@@ -17,16 +17,33 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import os, sys, subprocess, time, argparse, inspect, shutil, socket, threading, urllib2
-import socks
+import argparse
+import os
+import sys
+import subprocess
+import shutil
+import socket
+import time
+import threading
+import urllib2
 
 from stem.control import Controller
 from stem import SocketError
 
-import strings, helpers, web
+import socks
 
-class NoTor(Exception): pass
-class TailsError(Exception): pass
+import strings
+import helpers
+import web
+
+
+class NoTor(Exception):
+    pass
+
+
+class TailsError(Exception):
+    pass
+
 
 class OnionShare(object):
     def __init__(self, debug=False, local_only=False, stay_open=False):
@@ -67,11 +84,16 @@ class OnionShare(object):
         if helpers.get_platform() == 'Tails' and not tails_root:
             # in Tails, start the hidden service in a root process
             if gui:
-                args = ['/usr/bin/gksudo', '-D', 'OnionShare', '--', '/usr/bin/onionshare']
+                args = ['/usr/bin/gksudo', '-D',
+                        'OnionShare', '--', '/usr/bin/onionshare']
             else:
                 args = ['/usr/bin/sudo', '--', '/usr/bin/onionshare']
-            p = subprocess.Popen(args+[str(self.port)], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            stdout = p.stdout.read(22) # .onion URLs are 22 chars long
+
+            # XXX Use ProcessProtocol here
+            p = subprocess.Popen(
+                args+[str(self.port)],
+                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            stdout = p.stdout.read(22)  # .onion URLs are 22 chars long
 
             if stdout:
                 self.onion_host = stdout
@@ -87,7 +109,8 @@ class OnionShare(object):
 
             else:
                 # come up with a hidden service directory name
-                hidserv_dir = '{0}/onionshare_{1}'.format(helpers.get_tmp_dir(), helpers.random_string(8))
+                hidserv_dir = '{0}/onionshare_{1}'.format(
+                    helpers.get_tmp_dir(), helpers.random_string(8))
                 self.cleanup_filenames.append(hidserv_dir)
 
                 # connect to the tor controlport
@@ -95,12 +118,15 @@ class OnionShare(object):
                 tor_control_ports = [9051, 9151]
                 for tor_control_port in tor_control_ports:
                     try:
-                        controller = Controller.from_port(port=tor_control_port)
+                        controller = Controller.from_port(
+                            port=tor_control_port)
                         break
                     except SocketError:
                         pass
                 if not controller:
-                    raise NoTor(strings._("cant_connect_ctrlport").format(tor_control_ports))
+                    raise NoTor(
+                        strings._("cant_connect_ctrlport").format(
+                            tor_control_ports))
                 controller.authenticate()
 
                 # set up hidden service
@@ -122,7 +148,8 @@ class OnionShare(object):
         ready = False
         while not ready:
             try:
-                sys.stdout.write('{0} '.format(strings._('wait_for_hs_trying')))
+                sys.stdout.write('{0} '.format(
+                    strings._('wait_for_hs_trying')))
                 sys.stdout.flush()
 
                 if helpers.get_platform() == 'Tails':
@@ -135,7 +162,9 @@ class OnionShare(object):
                     for tor_socks_port in tor_socks_ports:
                         try:
                             s = socks.socksocket()
-                            s.setproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', tor_socks_port)
+                            s.setproxy(
+                                socks.PROXY_TYPE_SOCKS5, '127.0.0.1',
+                                tor_socks_port)
                             s.connect((self.onion_host, 80))
                             s.close()
                             tor_exists = True
@@ -143,19 +172,21 @@ class OnionShare(object):
                         except socks.ProxyConnectionError:
                             pass
                     if not tor_exists:
-                        raise NoTor(strings._("cant_connect_socksport").format(tor_socks_ports))
+                        raise NoTor(strings._(
+                            "cant_connect_socksport").format(tor_socks_ports))
                 ready = True
 
                 sys.stdout.write('{0}\n'.format(strings._('wait_for_hs_yup')))
-            except socks.SOCKS5Error: # non-Tails error
+            except socks.SOCKS5Error:  # non-Tails error
                 sys.stdout.write('{0}\n'.format(strings._('wait_for_hs_nope')))
                 sys.stdout.flush()
-            except urllib2.HTTPError: # Tails error
+            except urllib2.HTTPError:  # Tails error
                 sys.stdout.write('{0}\n'.format(strings._('wait_for_hs_nope')))
                 sys.stdout.flush()
             except KeyboardInterrupt:
                 return False
         return True
+
 
 def tails_root():
     # if running in Tails and as root, do only the things that require root
@@ -167,11 +198,15 @@ def tails_root():
         try:
             port = int(args.port[0])
         except ValueError:
-            sys.stderr.write('{0}\n'.format(strings._("error_tails_invalid_port")))
+            sys.stderr.write('{0}\n'.format(strings._(
+                "error_tails_invalid_port")))
             sys.exit(-1)
 
         # open hole in firewall
-        subprocess.call(['/sbin/iptables', '-I', 'OUTPUT', '-o', 'lo', '-p', 'tcp', '--dport', str(port), '-j', 'ACCEPT'])
+        # XXX Use ProcessProtocol
+        subprocess.call(
+            ['/sbin/iptables', '-I', 'OUTPUT', '-o', 'lo',
+             '-p', 'tcp', '--dport', str(port), '-j', 'ACCEPT'])
 
         # start hidden service
         app = OnionShare()
@@ -183,15 +218,20 @@ def tails_root():
 
         # close hole in firewall on shutdown
         import signal
-        def handler(signum = None, frame = None):
-            subprocess.call(['/sbin/iptables', '-D', 'OUTPUT', '-o', 'lo', '-p', 'tcp', '--dport', str(port), '-j', 'ACCEPT'])
+
+        def handler(signum=None, frame=None):
+            subprocess.call(
+                ['/sbin/iptables', '-D', 'OUTPUT', '-o', 'lo',
+                 '-p', 'tcp', '--dport', str(port), '-j', 'ACCEPT'])
             sys.exit()
-        for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGQUIT]:
-            signal.signal(sig, handler)
+        signals = ["SIGTERM", "SIGINT", "SIGHUP", "SIGQUIT"]
+        for sig in signals:
+            signal.signal(getattr(signal, sig), handler)
 
         # stay open until killed
         while True:
             time.sleep(1)
+
 
 def main():
     strings.load_strings()
@@ -199,10 +239,14 @@ def main():
 
     # parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--local-only', action='store_true', dest='local_only', help=strings._("help_local_only"))
-    parser.add_argument('--stay-open', action='store_true', dest='stay_open', help=strings._("help_stay_open"))
-    parser.add_argument('--debug', action='store_true', dest='debug', help=strings._("help_debug"))
-    parser.add_argument('filename', metavar='filename', nargs='+', help=strings._('help_filename'))
+    parser.add_argument('--local-only', action='store_true', dest='local_only',
+                        help=strings._("help_local_only"))
+    parser.add_argument('--stay-open', action='store_true', dest='stay_open',
+                        help=strings._("help_stay_open"))
+    parser.add_argument('--debug', action='store_true', dest='debug',
+                        help=strings._("help_debug"))
+    parser.add_argument('filename', metavar='filename', nargs='+',
+                        help=strings._('help_filename'))
     args = parser.parse_args()
 
     filenames = args.filename

@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from PyQt4 import QtCore, QtGui
 
-import common
-from onionshare import strings, helpers
+from onionshare import strings
+
 
 class Options(QtGui.QHBoxLayout):
     def __init__(self, web):
@@ -28,7 +28,7 @@ class Options(QtGui.QHBoxLayout):
         self.addSpacing(10)
 
         self.web = web
-        
+
         # close automatically
         self.close_automatically = QtGui.QCheckBox()
         if self.web.stay_open:
@@ -36,7 +36,9 @@ class Options(QtGui.QHBoxLayout):
         else:
             self.close_automatically.setCheckState(QtCore.Qt.Checked)
         self.close_automatically.setText(strings._("close_on_finish"))
-        self.connect(self.close_automatically, QtCore.SIGNAL('stateChanged(int)'), self.stay_open_changed)
+        self.connect(
+            self.close_automatically, QtCore.SIGNAL('stateChanged(int)'),
+            self.stay_open_changed)
 
         # add the widgets
         self.addWidget(self.close_automatically)
@@ -46,4 +48,3 @@ class Options(QtGui.QHBoxLayout):
             self.web.set_stay_open(False)
         else:
             self.web.set_stay_open(True)
-

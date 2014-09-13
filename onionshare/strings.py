@@ -17,14 +17,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import json, locale
+import json
+import locale
+
 import helpers
 
 strings = {}
 
+
 def load_strings(default="en"):
     global strings
-    translated = json.loads(open('{0}/strings.json'.format(helpers.get_onionshare_dir())).read())
+    translated = json.loads(
+        open('{0}/strings.json'.format(helpers.get_onionshare_dir())).read())
     strings = translated[default]
     lc, enc = locale.getdefaultlocale()
     if lc:
@@ -34,6 +38,7 @@ def load_strings(default="en"):
             for key in translated[default]:
                 if key in translated[lang]:
                     strings[key] = translated[lang][key]
+
 
 def translated(k):
     return strings[k].encode("utf-8")
