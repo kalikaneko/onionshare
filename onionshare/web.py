@@ -3,6 +3,7 @@
 OnionShare | https://onionshare.org/
 
 Copyright (C) 2014 Micah Lee <micah@micahflee.com>
+Copyright (C) 2014 Kali Kaneko <kali@leap.se>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,22 +18,35 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import Queue, mimetypes, platform, os, sys, zipfile, urllib2
-from flask import Flask, Response, request, render_template_string, abort
+# REFACTOR IN PROGRESS --------------------------------------------
+# (see onionshare.py)
+# -----------------------------------------------------------------
 
-import strings, helpers
+import os
 
-app = Flask(__name__)
+from twisted.web.template import Element, renderer, XMLFile, tags
+from twisted.python.filepath import FilePath
+
+import helpers
+from strings import _
+
+filesize_human = lambda i: helpers.human_readable_filesize(float(i))
+
+static = os.path.abspath("./static")
 
 # information about the file
 file_info = []
 zip_filename = None
 zip_filesize = None
+
+get_filename = lambda name: os.path.basename(name).decode("utf-8")
+
+
 def set_file_info(filenames):
     global file_info, zip_filename, zip_filesize
 
     # build file info list
-    file_info = {'files':[], 'dirs':[]}
+    file_info = {'files': [], 'dirs': []}
     for filename in filenames:
         info = {
             'filename': filename,
@@ -46,8 +60,10 @@ def set_file_info(filenames):
             info['size'] = helpers.dir_size(filename)
             info['size_human'] = helpers.human_readable_filesize(info['size'])
             file_info['dirs'].append(info)
-    file_info['files'] = sorted(file_info['files'], key=lambda k: k['basename'])
-    file_info['dirs'] = sorted(file_info['dirs'], key=lambda k: k['basename'])
+    file_info['files'] = sorted(
+        file_info['files'], key=lambda k: k['basename'])
+    file_info['dirs'] = sorted(
+        file_info['dirs'], key=lambda k: k['basename'])
 
     # zip up the files and folders
     z = helpers.ZipWriter()
@@ -59,150 +75,81 @@ def set_file_info(filenames):
     zip_filename = z.zip_filename
     zip_filesize = os.path.getsize(zip_filename)
 
-REQUEST_LOAD = 0
-REQUEST_DOWNLOAD = 1
-REQUEST_PROGRESS = 2
-REQUEST_OTHER = 3
-q = Queue.Queue()
-
-def add_request(type, path, data=None):
-    global q
-    q.put({
-      'type': type,
-      'path': path,
-      'data': data
-    })
 
 slug = helpers.random_string(16)
 download_count = 0
 
-stay_open = False
-def set_stay_open(new_stay_open):
-    global stay_open
-    stay_open = new_stay_open
-def get_stay_open():
-    return stay_open
 
-def debug_mode():
-    import logging
+class OnionSharePageHtml(Element):
 
-    if platform.system() == 'Windows':
-        temp_dir = os.environ['Temp'].replace('\\', '/')
-    else:
-        temp_dir = '/tmp/'
+    loader = XMLFile(FilePath(os.path.join(
+        static, 'index.xhtml')))
 
-    log_handler = logging.FileHandler('{0}/onionshare_server.log'.format(temp_dir))
-    log_handler.setLevel(logging.WARNING)
-    app.logger.addHandler(log_handler)
+    def __init__(self, *args, **kwargs):
+        self.slug = kwargs.pop("slug", None)
+        Element.__init__(self, *args, **kwargs)
 
-@app.route("/<slug_candidate>")
-def index(slug_candidate):
-    if not helpers.constant_time_compare(slug.encode('ascii'), slug_candidate.encode('ascii')):
-        abort(404)
+    @renderer
+    def css(self, request, tag):
+        # XXX remove bogus <script> tag
+        with open(os.path.join(static, "onionshare.css")) as f:
+            css = f.read()
+        return tag(css, tags.script(type_="text/css"))
 
-    add_request(REQUEST_LOAD, request.path)
-    return render_template_string(
-        open('{0}/index.html'.format(helpers.get_onionshare_dir())).read(),
-        slug=slug,
-        file_info=file_info,
-        filename=os.path.basename(zip_filename).decode("utf-8"),
-        filesize=zip_filesize,
-        filesize_human=helpers.human_readable_filesize(zip_filesize),
-        strings=strings.strings
-    )
+    @renderer
+    def file_meta(self, request, tag):
+        filename = get_filename(zip_filename)
+        tag.fillSlots(filename=filename,
+                      filesize=filesize_human(zip_filesize))
+        return tag
 
-@app.route("/<slug_candidate>/download")
-def download(slug_candidate):
-    global download_count
-    if not helpers.constant_time_compare(slug.encode('ascii'), slug_candidate.encode('ascii')):
-        abort(404)
+    @renderer
+    def meta_filesize(self, request, tag):
+        return tag(tags.meta(
+            name="onionshare-filesize",
+            content=filesize_human(zip_filesize)))
 
-    # each download has a unique id
-    download_id = download_count
-    download_count += 1
+    @renderer
+    def download_link(self, request, tag):
+        button_text = u"{filename} ▼ :"
+        filename = get_filename(zip_filename)
+        return tag(tags.a(button_text.format(
+            filename=filename), href="/{slug}/download".format(
+                slug=self.slug),
+            class_="button"))
 
-    # prepare some variables to use inside generate() function below
-    # which is outsie of the request context
-    shutdown_func = request.environ.get('werkzeug.server.shutdown')
-    path = request.path
+    @renderer
+    def filename(self, request, tag):
+        return tag(tags.p(zip_filename), id='filename')
 
-    # tell GUI the download started
-    add_request(REQUEST_DOWNLOAD, path, { 'id':download_id })
+    @renderer
+    def download_size(self, request, tag):
+        tag.fillSlots(p_size_class="download-size",
+                      size_str="%s :" % _("download_size"))
+        return tag
 
-    dirname = os.path.dirname(zip_filename)
-    basename = os.path.basename(zip_filename)
+    @renderer
+    def filesize_human(self, request, tag):
+        tag.fillSlots(filesize_human_title="filesyze bytes",
+                      filesize_human=filesize_human(zip_filesize))
+        return tag
 
-    def generate():
-        chunk_size = 102400 # 100kb
+    @renderer
+    def file_table_header(self, request, tag):
+        tag.fillSlots(filename_str=_("filename"),
+                      filesize_str=_("size"))
+        return tag
 
-        fp = open(zip_filename, 'rb')
-        done = False
-        while not done:
-            chunk = fp.read(102400)
-            if chunk == '':
-                done = True
-            else:
-                yield chunk
+    @renderer
+    def file_info_table_dir_entries(self, request, tag):
+        for info in file_info['dirs']:
+            yield tag.clone().fillSlots(
+                basename=info["basename"],
+                size=info["size_human"])
 
-                # tell GUI the progress
-                downloaded_bytes = fp.tell()
-                percent = round((1.0 * downloaded_bytes / zip_filesize) * 100, 2);
-                sys.stdout.write("\r{0}, {1}%          ".format(helpers.human_readable_filesize(downloaded_bytes), percent))
-                sys.stdout.flush()
-                add_request(REQUEST_PROGRESS, path, { 'id':download_id, 'bytes':downloaded_bytes })
-
-        fp.close()
-        sys.stdout.write("\n")
-
-        # download is finished, close the server
-        if not stay_open:
-            print strings._("closing_automatically")
-            if shutdown_func is None:
-                raise RuntimeError('Not running with the Werkzeug Server')
-            shutdown_func()
-
-    r = Response(generate())
-    r.headers.add('Content-Length', zip_filesize)
-    r.headers.add('Content-Disposition', 'attachment', filename=basename)
-
-    # guess content type
-    (content_type, _) = mimetypes.guess_type(basename, strict=False)
-    if content_type is not None:
-        r.headers.add('Content-Type', content_type)
-    return r
-
-@app.errorhandler(404)
-def page_not_found(e):
-    add_request(REQUEST_OTHER, request.path)
-    return render_template_string(open('{0}/404.html'.format(helpers.get_onionshare_dir())).read())
-
-# shutting down the server only works within the context of flask, so the easiest way to do it is over http
-shutdown_slug = helpers.random_string(16)
-@app.route("/<shutdown_slug_candidate>/shutdown")
-def shutdown(shutdown_slug_candidate):
-    if not helpers.constant_time_compare(shutdown_slug.encode('ascii'), shutdown_slug_candidate.encode('ascii')):
-        abort(404)
-
-    # shutdown the flask service
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func is None:
-        raise RuntimeError('Not running with the Werkzeug Server')
-    func()
-
-    return ""
-
-def start(port, stay_open=False):
-    set_stay_open(stay_open)
-    app.run(port=port)
-
-def stop(port):
-    # to stop flask, load http://127.0.0.1:<port>/<shutdown_slug>/shutdown
-    if helpers.get_platform() == 'Tails':
-        # in Tails everything is proxies over Tor, so we need to get lower level
-        # to connect not over the proxy
-        import socket
-        s = socket.socket()
-        s.connect(('127.0.0.1', port))
-        s.sendall('GET /{0}/shutdown HTTP/1.1\r\n\r\n'.format(shutdown_slug))
-    else:
-        urllib2.urlopen('http://127.0.0.1:{0}/{1}/shutdown'.format(port, shutdown_slug)).read()
+    @renderer
+    def file_info_table_file_entries(self, request, tag):
+        for info in file_info['files']:
+            yield tag.clone().fillSlots(
+                basename=info["basename"],
+                size=info["size_human"])

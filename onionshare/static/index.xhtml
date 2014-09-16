@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+  <html xmlns:t="http://twistedmatrix.com/ns/twisted.web.template/0.1">
+    <title>OnionShare</title>
+    <head t:render="file_meta">
+    <meta name="onionshare-filesize"><t:attr name="content"><t:slot name="filesize" /></t:attr></meta>
+    <meta name="onionshare-filename"><t:attr name="content"><t:slot name="filename" /></t:attr></meta>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <style t:render="css"></style>
+  </head>
+  <body>
+    <p t:render="download_link"/>
+    <p t:render="download_size"><t:attr name="p_size_class"></t:attr><t:slot name="size_str"/>
+      <strong t:render="filesize_human"><t:attr name="filesize_human_title"></t:attr><t:slot name="filesize_human"/></strong>
+    </p>
+
+    <table class="file-list">
+      <tr t:render="file_table_header">
+        <th></th>
+	<th><t:slot name="filename_str"/></th>
+	<th><t:slot name="filesize_str"/></th>
+      </tr>
+
+      <tr t:render="file_info_table_dir_entries">
+        <td><img width="30" height="30" title="" alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAB3RJTUUH3ggbFCQXOpwjbQAAAM5JREFUSMftlksOwyAMRDFCbNjkDL1kz9K75Cq9AZF3kYIM7oqoP/KpcFK1mRUrnsbW2Fbq0N+JiPhZRMS1OZAfzLzocwCAGmC9V2Vhjduarj8CzynGqIwxsDl4SXV267E4uFTN33X8deCxDyV1XXeRYJo1UUDEa9M0pxoRK+b4HiqRcz3nVAJKRK+TSxqaGbrkNKUkBn0oNSK2+T0MA1dau9NzO4QwuvPen1lAxQtEsq/vNpSWhvZ9v/3IRMTWOQezkyuEoKy14tfHoU11A6Mr5AxrpuMVAAAAAElFTkSuQmCC" /></td>
+	<td><t:slot name="basename"/></td>
+	<td><t:slot name="size"/></td>
+      </tr>
+
+      <tr t:render="file_info_table_file_entries">
+        <td><img width="30" height="30" title="" alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAB3RJTUUH3ggbFCQqYvRvfAAAAJFJREFUSMftlUkOwCAIAEWJ//+uIUivtYmtG7VN8KYHRhlA5zYtuB6klCTG2BcEAHrBeN4ws3jvX3lxQZmFiogMgVesVrhKXlvgakKf4KqVdAdXL+Ea3O8aILh0GnUMEhjtw9mLbUv1tx33fgItynBVoN+k2hybY3Nsjg08Bs45q4GYuQ4OIQARLYcSkUPEoiUP4j5IFasKOnUAAAAASUVORK5CYII=" /></td>
+	<td><t:slot name="basename"/></td>
+	<td><t:slot name="size"/></td>
+      </tr>
+    </table>
+  </body>
+</html>
