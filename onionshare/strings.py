@@ -19,14 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import json, locale
 import helpers
+import os
 
 strings = {}
+
+LANG = os.environ.get("LANG")
 
 def load_strings(default="en"):
     global strings
     translated = json.loads(open('{0}/strings.json'.format(helpers.get_onionshare_dir())).read())
     strings = translated[default]
-    lc, enc = locale.getdefaultlocale()
+    if LANG is None:
+        lc, enc = locale.getdefaultlocale()
+    else:
+        lc = LANG
     if lc:
         lang = lc[:2]
         if lang in translated:
